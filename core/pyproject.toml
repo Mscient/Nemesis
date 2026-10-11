@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stocksense-core"
+version = "0.1.0"
+description = "Analytics core — deterministic inventory math"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=2.1",
+    "scipy>=1.14",
+    "statsmodels>=0.14",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["stocksense_core*"]

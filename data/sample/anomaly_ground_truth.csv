@@ -1,0 +1,8 @@
+date,sku,class
+2026-02-20,WATER-500,data_error
+2026-04-11,JUICE-1L,stockout_censored
+2026-04-12,JUICE-1L,stockout_censored
+2026-04-13,JUICE-1L,stockout_censored
+2026-04-14,JUICE-1L,stockout_censored
+2026-04-15,JUICE-1L,stockout_censored
+2026-04-16,JUICE-1L,stockout_censored

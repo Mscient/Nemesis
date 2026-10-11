@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stocksense-ai"
+version = "0.1.0"
+description = "LLM / AI layer for StockSense — suggests, explains, never calculates"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.9",
+    "httpx>=0.27",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["stocksense_ai*"]
