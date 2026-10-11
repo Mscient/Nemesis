@@ -8,8 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from app.config import settings
 from app.db.models import Base
 
+connect_args = {}
+if "postgresql" in settings.database_url:
+    connect_args["statement_cache_size"] = 0
+
 engine = create_async_engine(
     settings.database_url,
+    connect_args=connect_args,
     echo=False,
     future=True,
 )
