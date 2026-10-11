@@ -1,18 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import './App.css'
+import { api, toProduct, type Product as ApiProduct } from './api'
 
-type Product = { name: string; sku: string; category: string; supplier: string; stock: number; demand: number; lead: number; safety: number; price: number; incoming: number }
-const products: Product[] = [
-  { name: 'Glass Water Bottle · 750ml', sku: 'KIT-2048', category: 'Kitchen', supplier: 'Northstar Goods', stock: 42, demand: 8.4, lead: 9, safety: 24, price: 12.5, incoming: 0 },
-  { name: 'Organic Jasmine Rice · 5kg', sku: 'GRC-1102', category: 'Grocery', supplier: 'Harvest & Co.', stock: 86, demand: 11.2, lead: 7, safety: 28, price: 18, incoming: 120 },
-  { name: 'Cold Pressed Olive Oil · 1L', sku: 'GRC-0917', category: 'Grocery', supplier: 'Mediterranean Supply', stock: 18, demand: 5.6, lead: 12, safety: 22, price: 16.8, incoming: 0 },
-  { name: 'Insulated Travel Mug', sku: 'KIT-3380', category: 'Kitchen', supplier: 'Northstar Goods', stock: 14, demand: 3.9, lead: 14, safety: 18, price: 22, incoming: 0 },
-  { name: 'Shipping Mailer · Medium', sku: 'PKG-0054', category: 'Packaging', supplier: 'PackRight Inc.', stock: 315, demand: 18, lead: 5, safety: 65, price: 0.42, incoming: 500 },
-  { name: 'Oat Milk · 1L (12 pack)', sku: 'GRC-2201', category: 'Grocery', supplier: 'Daily Roots', stock: 9, demand: 7.1, lead: 4, safety: 20, price: 24, incoming: 0 },
-  { name: 'Cotton Produce Bags · Set of 5', sku: 'HOM-1188', category: 'Home', supplier: 'Evergreen Textiles', stock: 132, demand: 2.4, lead: 10, safety: 16, price: 9.5, incoming: 0 },
-  { name: 'Compostable Cup · 12oz (50 pack)', sku: 'PKG-0215', category: 'Packaging', supplier: 'PackRight Inc.', stock: 57, demand: 6.2, lead: 8, safety: 30, price: 7.2, incoming: 100 },
-]
+// Re-export from api.ts so components below can still use the local name
+type Product = ApiProduct
+
+// ── Static chart / nav data (unchanged) ────────────────────────────────────
 const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const trend = days.map((day, i) => ({ day, demand: [92, 108, 98, 125, 117, 145, 132][i], forecast: [99, 103, 105, 112, 121, 132, 138][i] }))
 const inventoryTrend = days.map((day, i) => ({ day, stock: [760, 724, 690, 648, 617, 580, 542][i], reorder: 390 }))
@@ -33,7 +27,35 @@ function App() {
   const [leadChange, setLeadChange] = useState(3)
   const [notice, setNotice] = useState('')
   const [range, setRange] = useState('Last 7 days')
-  const rows = useMemo(() => products.filter(p => (category === 'All categories' || p.category === category) && `${p.name} ${p.sku} ${p.supplier}`.toLowerCase().includes(query.toLowerCase()) && (filter === 'All items' || statusOf(p) === filter)), [category, query, filter])
+
+  // ── Live data from backend ────────────────────────────────────────────────
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [backendError, setBackendError] = useState(false)
+  const [syncLabel, setSyncLabel] = useState('Connecting…')
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const skus = await api.listSkus()
+        if (cancelled) return
+        setProducts(skus.map(s => toProduct(s)))
+        setSyncLabel('Synced just now')
+        setBackendError(false)
+      } catch {
+        if (cancelled) return
+        setBackendError(true)
+        setSyncLabel('Backend offline')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
+
+  const rows = useMemo(() => products.filter(p => (category === 'All categories' || p.category === category) && `${p.name} ${p.sku} ${p.supplier}`.toLowerCase().includes(query.toLowerCase()) && (filter === 'All items' || statusOf(p) === filter)), [products, category, query, filter])
   const riskCount = products.filter(p => statusOf(p) === 'Critical' || statusOf(p) === 'Reorder now').length
   const atRisk = products.filter(p => statusOf(p) !== 'Healthy').reduce((sum, p) => sum + Math.max(0, p.demand * p.lead + p.safety - p.stock - p.incoming) * p.price, 0)
   const scenarios = useMemo(() => products.map(p => {
@@ -53,9 +75,12 @@ function App() {
       {nav.map(section => <div className="nav-section" key={section.group}><div className="nav-label">{section.group}</div>{section.items.map(([name, icon]) => <button key={name} className={`nav-item ${page === name ? 'active' : ''}`} onClick={() => setPage(name)}><span className="nav-icon">{icon}</span>{name}{name === 'Replenishment' && <span className="nav-count">{riskCount}</span>}</button>)}</div>)}
       <div className="sidebar-bottom"><button className={`nav-item ${page === 'Settings' ? 'active' : ''}`} onClick={() => setPage('Settings')}><span className="nav-icon">⚙</span>Settings</button><div className="user-card"><div className="avatar">AM</div><span><b>Alex Morgan</b><small>Inventory manager</small></span><button className="more-button" aria-label="User options" onClick={() => openNotice('Profile settings are up to date')}>···</button></div></div>
     </aside>
-    <main className="main-area"><header className="topbar"><div className="breadcrumb">Workspace <span>/</span> <b>{pageTitle}</b></div><div className="top-actions"><label className="global-search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search products, SKUs..." /><kbd>⌘ K</kbd></label><button className="icon-button notification" aria-label="Notifications" onClick={() => openNotice(`${riskCount} products need your attention`)}>♧<i /></button><div className="top-divider"/><div className="sync-state"><i/> Synced just now</div></div></header>
+    <main className="main-area">
+      <header className="topbar"><div className="breadcrumb">Workspace <span>/</span> <b>{pageTitle}</b></div><div className="top-actions"><label className="global-search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search products, SKUs..." /><kbd>⌘ K</kbd></label><button className="icon-button notification" aria-label="Notifications" onClick={() => openNotice(`${riskCount} products need your attention`)}>♧<i /></button><div className="top-divider"/><div className={`sync-state${backendError ? ' sync-error' : ''}`}><i/> {syncLabel}</div></div></header>
+      {loading && <div className="api-banner api-loading">⟳ &nbsp;Loading live inventory data…</div>}
+      {!loading && backendError && <div className="api-banner api-error">⚠ &nbsp;Backend unreachable — showing empty inventory. Make sure <code>fastapi dev main.py</code> is running in <code>backend/app</code>.</div>}
       <div className="page-content"><div className="page-heading"><div><div className="eyebrow">SUNDAY, OCTOBER 11, 2026 <span className="live-pill"><i/> DEMO DATA</span></div><h1>{page === 'Overview' ? 'Good morning, Alex' : pageTitle}</h1><p>{page === 'Overview' ? 'Here’s what’s happening across your inventory today.' : page === 'Scenario simulator' ? 'Stress-test your inventory plan against changing conditions.' : `Monitor and manage your ${pageTitle.toLowerCase()} in one place.`}</p></div><div className="heading-actions"><button className="button secondary" onClick={() => openNotice('Your inventory data is up to date')}>⟳ <span>Sync data</span></button><button className="button primary" onClick={() => page === 'Replenishment' ? openNotice('Purchase order draft created') : setPage('Replenishment')}>＋ <span>{page === 'Replenishment' ? 'Create purchase order' : 'Plan replenishment'}</span></button></div></div>
-      {page === 'Overview' && <Overview riskCount={riskCount} atRisk={atRisk} setPage={setPage} range={range} setRange={setRange} setSelected={setSelected} />}
+      {page === 'Overview' && <Overview products={products} riskCount={riskCount} atRisk={atRisk} setPage={setPage} range={range} setRange={setRange} setSelected={setSelected} />}
       {(page === 'Inventory' || page === 'Replenishment') && <InventoryPage page={page} rows={rows} category={category} setCategory={setCategory} filter={filter} setFilter={setFilter} setSelected={setSelected} />}
       {page === 'Scenario simulator' && <ScenarioPage scenarios={scenarios} demandChange={demandChange} setDemandChange={setDemandChange} leadChange={leadChange} setLeadChange={setLeadChange} />}
       {page !== 'Overview' && page !== 'Inventory' && page !== 'Replenishment' && page !== 'Scenario simulator' && <InsightsPage page={page} rows={rows} setPage={setPage} />}
@@ -69,9 +94,9 @@ function App() {
 function Status({ status }: { status: string }) { return <span className={`status status-${status.toLowerCase().replaceAll(' ', '-')}`}><i/>{status}</span> }
 function Metric({ label, value }: { label: string; value: string }) { return <div className="detail-metric"><span>{label}</span><b>{value}</b></div> }
 
-function Overview({ riskCount, atRisk, setPage, range, setRange, setSelected }: { riskCount: number; atRisk: number; setPage: (page: string) => void; range: string; setRange: (range: string) => void; setSelected: (p: Product) => void }) {
+function Overview({ products, riskCount, atRisk, setPage, range, setRange, setSelected }: { products: Product[]; riskCount: number; atRisk: number; setPage: (page: string) => void; range: string; setRange: (range: string) => void; setSelected: (p: Product) => void }) {
   const totalValue = products.reduce((s, p) => s + (p.stock + p.incoming) * p.price, 0)
-  const cards = [{ label: 'Total products', value: '1,284', foot: 'Across 4 categories', icon: '▤', tone: 'blue', trend: '+4.8%' }, { label: 'Need replenishment', value: String(riskCount + 6), foot: `${riskCount} need action today`, icon: '↗', tone: 'amber', trend: '−2 from last week' }, { label: 'Inventory value', value: money(totalValue + 24180), foot: 'On hand + incoming', icon: '$', tone: 'violet', trend: '+2.1%' }, { label: 'Stockout exposure', value: money(atRisk), foot: 'Estimated at-risk value', icon: '⚠', tone: 'red', trend: 'Review now' }]
+  const cards = [{ label: 'Total products', value: String(products.length || '1,284'), foot: 'Across 4 categories', icon: '▤', tone: 'blue', trend: '+4.8%' }, { label: 'Need replenishment', value: String(riskCount + 6), foot: `${riskCount} need action today`, icon: '↗', tone: 'amber', trend: '−2 from last week' }, { label: 'Inventory value', value: money(totalValue + 24180), foot: 'On hand + incoming', icon: '$', tone: 'violet', trend: '+2.1%' }, { label: 'Stockout exposure', value: money(atRisk), foot: 'Estimated at-risk value', icon: '⚠', tone: 'red', trend: 'Review now' }]
   const tableRows = [...products].sort((a, b) => (a.stock / a.demand - b.stock / b.demand)).slice(0, 5)
   return <>
     <div className="section-kicker"><span>INVENTORY HEALTH</span><button className="filter-link" onClick={() => setPage('Inventory')}>All products <span>→</span></button></div>
@@ -86,7 +111,7 @@ function Overview({ riskCount, atRisk, setPage, range, setRange, setSelected }: 
 function InventoryPage({ page, rows, category, setCategory, filter, setFilter, setSelected }: { page: string; rows: Product[]; category: string; setCategory: (v: string) => void; filter: string; setFilter: (v: string) => void; setSelected: (p: Product) => void }) {
   const replenishment = page === 'Replenishment'
   return <><div className="section-kicker"><span>{replenishment ? 'REPLENISHMENT WORKQUEUE' : 'PRODUCT CATALOG'} <b className="count-label">{rows.length} products</b></span><button className="button secondary small-button" onClick={() => { const csv = ['Product,SKU,Category,Stock,Daily Demand,Lead Time,Status', ...rows.map(p => `"${p.name}",${p.sku},${p.category},${p.stock},${p.demand},${p.lead},${statusOf(p)}`)].join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'stocksense-inventory.csv'; a.click(); URL.revokeObjectURL(a.href) }}>↓ <span>Export CSV</span></button></div>
-    <div className="kpi-grid mini-kpis"><div className="kpi-card"><div className="kpi-top"><span>{replenishment ? 'Open recommendations' : 'Tracked products'}</span><span className="kpi-icon blue">▤</span></div><div className="kpi-value">{replenishment ? rows.filter(p => statusOf(p) !== 'Healthy').length : '1,284'}</div><div className="kpi-foot"><span>{replenishment ? 'Across all categories' : '4 product categories'}</span></div></div><div className="kpi-card"><div className="kpi-top"><span>Below reorder point</span><span className="kpi-icon amber">↗</span></div><div className="kpi-value">{products.filter(p => ['Critical', 'Reorder now'].includes(statusOf(p))).length + 6}</div><div className="kpi-foot"><span>Requires purchasing review</span></div></div><div className="kpi-card"><div className="kpi-top"><span>Incoming units</span><span className="kpi-icon violet">↓</span></div><div className="kpi-value">720</div><div className="kpi-foot"><span>Across 3 purchase orders</span></div></div></div>
+    <div className="kpi-grid mini-kpis"><div className="kpi-card"><div className="kpi-top"><span>{replenishment ? 'Open recommendations' : 'Tracked products'}</span><span className="kpi-icon blue">▤</span></div><div className="kpi-value">{replenishment ? rows.filter(p => statusOf(p) !== 'Healthy').length : rows.length}</div><div className="kpi-foot"><span>{replenishment ? 'Across all categories' : '4 product categories'}</span></div></div><div className="kpi-card"><div className="kpi-top"><span>Below reorder point</span><span className="kpi-icon amber">↗</span></div><div className="kpi-value">{rows.filter(p => ['Critical', 'Reorder now'].includes(statusOf(p))).length}</div><div className="kpi-foot"><span>Requires purchasing review</span></div></div><div className="kpi-card"><div className="kpi-top"><span>Incoming units</span><span className="kpi-icon violet">↓</span></div><div className="kpi-value">{rows.reduce((s, p) => s + p.incoming, 0)}</div><div className="kpi-foot"><span>On order</span></div></div></div>
     <section className="panel full-table-panel"><div className="table-toolbar"><div className="filter-tabs">{['All items','Critical','Reorder now','Watch','Healthy'].map(f => <button key={f} className={filter === f ? 'selected' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div><div className="table-filters"><select value={category} onChange={e => setCategory(e.target.value)}><option>All categories</option>{['Grocery','Kitchen','Packaging','Home'].map(c => <option key={c}>{c}</option>)}</select><button className="button secondary small-button" onClick={() => setFilter('All items')}>☷ <span>Filters</span></button></div></div>
       <div className="table-wrap wide-table"><table><thead><tr><th>PRODUCT</th><th>SKU</th><th>CATEGORY</th><th>ON HAND</th><th>AVG. / DAY</th><th>LEAD TIME</th><th>REORDER POINT</th><th>{replenishment ? 'SUGGESTED ORDER' : 'STATUS'}</th><th/></tr></thead><tbody>{rows.map(p => { const reorder = Math.ceil(p.demand * p.lead + p.safety); const order = Math.max(0, Math.ceil(reorder * 1.5 - p.stock - p.incoming)); return <tr key={p.sku} onClick={() => setSelected(p)}><td><div className="product-cell"><span className={`product-thumb ${p.category.toLowerCase()}`}>{p.category === 'Grocery' ? '◉' : p.category === 'Packaging' ? '▱' : '◈'}</span><span><b>{p.name}</b><small>{p.supplier}</small></span></div></td><td className="muted-code">{p.sku}</td><td>{p.category}</td><td><b>{p.stock}</b> <small>units</small></td><td>{p.demand.toFixed(1)}</td><td>{p.lead} days</td><td>{reorder} units</td><td>{replenishment ? <b className="order-quantity">{order || '—'} {order ? 'units' : ''}</b> : <Status status={statusOf(p)}/>}</td><td><button className="row-arrow" aria-label="Open product details">↗</button></td></tr>})}</tbody></table>{rows.length === 0 && <div className="empty-state">No products match these filters. Try adjusting your search.</div>}</div><div className="table-bottom"><span>Showing {rows.length} of {rows.length} products</span><div><button disabled>← Previous</button><button className="page-number">1</button><button disabled>Next →</button></div></div>
     </section></>
