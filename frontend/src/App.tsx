@@ -1,122 +1,118 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
+import { useMemo, useState } from 'react'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import './App.css'
 
+type Product = { name: string; sku: string; category: string; supplier: string; stock: number; demand: number; lead: number; safety: number; price: number; incoming: number }
+const products: Product[] = [
+  { name: 'Glass Water Bottle · 750ml', sku: 'KIT-2048', category: 'Kitchen', supplier: 'Northstar Goods', stock: 42, demand: 8.4, lead: 9, safety: 24, price: 12.5, incoming: 0 },
+  { name: 'Organic Jasmine Rice · 5kg', sku: 'GRC-1102', category: 'Grocery', supplier: 'Harvest & Co.', stock: 86, demand: 11.2, lead: 7, safety: 28, price: 18, incoming: 120 },
+  { name: 'Cold Pressed Olive Oil · 1L', sku: 'GRC-0917', category: 'Grocery', supplier: 'Mediterranean Supply', stock: 18, demand: 5.6, lead: 12, safety: 22, price: 16.8, incoming: 0 },
+  { name: 'Insulated Travel Mug', sku: 'KIT-3380', category: 'Kitchen', supplier: 'Northstar Goods', stock: 14, demand: 3.9, lead: 14, safety: 18, price: 22, incoming: 0 },
+  { name: 'Shipping Mailer · Medium', sku: 'PKG-0054', category: 'Packaging', supplier: 'PackRight Inc.', stock: 315, demand: 18, lead: 5, safety: 65, price: 0.42, incoming: 500 },
+  { name: 'Oat Milk · 1L (12 pack)', sku: 'GRC-2201', category: 'Grocery', supplier: 'Daily Roots', stock: 9, demand: 7.1, lead: 4, safety: 20, price: 24, incoming: 0 },
+  { name: 'Cotton Produce Bags · Set of 5', sku: 'HOM-1188', category: 'Home', supplier: 'Evergreen Textiles', stock: 132, demand: 2.4, lead: 10, safety: 16, price: 9.5, incoming: 0 },
+  { name: 'Compostable Cup · 12oz (50 pack)', sku: 'PKG-0215', category: 'Packaging', supplier: 'PackRight Inc.', stock: 57, demand: 6.2, lead: 8, safety: 30, price: 7.2, incoming: 100 },
+]
+const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const trend = days.map((day, i) => ({ day, demand: [92, 108, 98, 125, 117, 145, 132][i], forecast: [99, 103, 105, 112, 121, 132, 138][i] }))
+const inventoryTrend = days.map((day, i) => ({ day, stock: [760, 724, 690, 648, 617, 580, 542][i], reorder: 390 }))
+const nav = [
+  { group: 'WORKSPACE', items: [['Overview', '▦'], ['Inventory', '▤'], ['Replenishment', '↗'], ['Demand forecasting', '⌁'], ['Anomaly detection', '◉'], ['Scenario simulator', '⟳']] },
+  { group: 'INSIGHTS', items: [['Forecast evaluation', '▥'], ['Reports', '▧']] },
+]
+const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US')
+const statusOf = (p: Product, reorder = p.demand * p.lead + p.safety) => p.stock + p.incoming <= reorder * .5 ? 'Critical' : p.stock + p.incoming <= reorder ? 'Reorder now' : p.stock + p.incoming <= reorder * 1.6 ? 'Watch' : 'Healthy'
+
 function App() {
-  const [count, setCount] = useState(0)
+  const [page, setPage] = useState('Overview')
+  const [query, setQuery] = useState('')
+  const [category, setCategory] = useState('All categories')
+  const [filter, setFilter] = useState('All items')
+  const [selected, setSelected] = useState<Product | null>(null)
+  const [demandChange, setDemandChange] = useState(25)
+  const [leadChange, setLeadChange] = useState(3)
+  const [notice, setNotice] = useState('')
+  const [range, setRange] = useState('Last 7 days')
+  const rows = useMemo(() => products.filter(p => (category === 'All categories' || p.category === category) && `${p.name} ${p.sku} ${p.supplier}`.toLowerCase().includes(query.toLowerCase()) && (filter === 'All items' || statusOf(p) === filter)), [category, query, filter])
+  const riskCount = products.filter(p => statusOf(p) === 'Critical' || statusOf(p) === 'Reorder now').length
+  const atRisk = products.filter(p => statusOf(p) !== 'Healthy').reduce((sum, p) => sum + Math.max(0, p.demand * p.lead + p.safety - p.stock - p.incoming) * p.price, 0)
+  const scenarios = useMemo(() => products.map(p => {
+    const adjustedDemand = p.demand * (1 + demandChange / 100)
+    const adjustedLead = p.lead + leadChange
+    const reorder = adjustedDemand * adjustedLead + p.safety
+    const position = p.stock + p.incoming
+    return { ...p, adjustedDemand, adjustedLead, reorder, position, order: Math.max(0, Math.ceil(reorder * 1.5 - position)), oldReorder: p.demand * p.lead + p.safety }
+  }), [demandChange, leadChange])
+  const openNotice = (text: string) => { setNotice(text); window.setTimeout(() => setNotice(''), 2600) }
+  const pageTitle = page === 'Demand forecasting' ? 'Demand forecasting' : page
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+  return <div className="app-shell">
+    <aside className="sidebar">
+      <div className="brand"><span className="brand-mark">S</span><span>stocksense<span className="brand-dot">.</span><small>INVENTORY INTELLIGENCE</small></span></div>
+      <div className="workspace-switch"><span className="workspace-avatar">N</span><span><b>Northstar Goods</b><small>Growth plan</small></span><span className="chevron">⌄</span></div>
+      {nav.map(section => <div className="nav-section" key={section.group}><div className="nav-label">{section.group}</div>{section.items.map(([name, icon]) => <button key={name} className={`nav-item ${page === name ? 'active' : ''}`} onClick={() => setPage(name)}><span className="nav-icon">{icon}</span>{name}{name === 'Replenishment' && <span className="nav-count">{riskCount}</span>}</button>)}</div>)}
+      <div className="sidebar-bottom"><button className={`nav-item ${page === 'Settings' ? 'active' : ''}`} onClick={() => setPage('Settings')}><span className="nav-icon">⚙</span>Settings</button><div className="user-card"><div className="avatar">AM</div><span><b>Alex Morgan</b><small>Inventory manager</small></span><button className="more-button" aria-label="User options" onClick={() => openNotice('Profile settings are up to date')}>···</button></div></div>
+    </aside>
+    <main className="main-area"><header className="topbar"><div className="breadcrumb">Workspace <span>/</span> <b>{pageTitle}</b></div><div className="top-actions"><label className="global-search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search products, SKUs..." /><kbd>⌘ K</kbd></label><button className="icon-button notification" aria-label="Notifications" onClick={() => openNotice(`${riskCount} products need your attention`)}>♧<i /></button><div className="top-divider"/><div className="sync-state"><i/> Synced just now</div></div></header>
+      <div className="page-content"><div className="page-heading"><div><div className="eyebrow">SUNDAY, OCTOBER 11, 2026 <span className="live-pill"><i/> DEMO DATA</span></div><h1>{page === 'Overview' ? 'Good morning, Alex' : pageTitle}</h1><p>{page === 'Overview' ? 'Here’s what’s happening across your inventory today.' : page === 'Scenario simulator' ? 'Stress-test your inventory plan against changing conditions.' : `Monitor and manage your ${pageTitle.toLowerCase()} in one place.`}</p></div><div className="heading-actions"><button className="button secondary" onClick={() => openNotice('Your inventory data is up to date')}>⟳ <span>Sync data</span></button><button className="button primary" onClick={() => page === 'Replenishment' ? openNotice('Purchase order draft created') : setPage('Replenishment')}>＋ <span>{page === 'Replenishment' ? 'Create purchase order' : 'Plan replenishment'}</span></button></div></div>
+      {page === 'Overview' && <Overview riskCount={riskCount} atRisk={atRisk} setPage={setPage} range={range} setRange={setRange} setSelected={setSelected} />}
+      {(page === 'Inventory' || page === 'Replenishment') && <InventoryPage page={page} rows={rows} category={category} setCategory={setCategory} filter={filter} setFilter={setFilter} setSelected={setSelected} />}
+      {page === 'Scenario simulator' && <ScenarioPage scenarios={scenarios} demandChange={demandChange} setDemandChange={setDemandChange} leadChange={leadChange} setLeadChange={setLeadChange} />}
+      {page !== 'Overview' && page !== 'Inventory' && page !== 'Replenishment' && page !== 'Scenario simulator' && <InsightsPage page={page} rows={rows} setPage={setPage} />}
+      <footer className="footer"><span>StockSense <b>·</b> Inventory intelligence</span><span>Demo workspace <b>·</b> Data refreshes automatically</span></footer></div>
+    </main>
+    {selected && <div className="modal-backdrop" onClick={() => setSelected(null)}><section className="detail-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)}>×</button><div className="eyebrow">PRODUCT DETAILS</div><h2>{selected.name}</h2><div className="detail-sku">{selected.sku} <span>·</span> {selected.category}</div><div className="detail-status"><Status status={statusOf(selected)}/><span>Supplier: {selected.supplier}</span></div><div className="detail-grid"><Metric label="On hand" value={`${selected.stock} units`}/><Metric label="Incoming" value={`${selected.incoming} units`}/><Metric label="Avg. daily demand" value={`${selected.demand} units`}/><Metric label="Lead time" value={`${selected.lead} days`}/><Metric label="Reorder point" value={`${Math.ceil(selected.demand * selected.lead + selected.safety)} units`}/><Metric label="Safety stock" value={`${selected.safety} units`}/></div><div className="formula-note">Reorder point = expected demand during lead time + safety stock</div><button className="button primary full-button" onClick={() => {setSelected(null); setPage('Replenishment')}}>View replenishment plan <span>→</span></button></section></div>}
+    {notice && <div role="status" className="toast">✓ &nbsp;{notice}</div>}
+  </div>
+}
 
-      <div className="ticks"></div>
+function Status({ status }: { status: string }) { return <span className={`status status-${status.toLowerCase().replaceAll(' ', '-')}`}><i/>{status}</span> }
+function Metric({ label, value }: { label: string; value: string }) { return <div className="detail-metric"><span>{label}</span><b>{value}</b></div> }
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+function Overview({ riskCount, atRisk, setPage, range, setRange, setSelected }: { riskCount: number; atRisk: number; setPage: (page: string) => void; range: string; setRange: (range: string) => void; setSelected: (p: Product) => void }) {
+  const totalValue = products.reduce((s, p) => s + (p.stock + p.incoming) * p.price, 0)
+  const cards = [{ label: 'Total products', value: '1,284', foot: 'Across 4 categories', icon: '▤', tone: 'blue', trend: '+4.8%' }, { label: 'Need replenishment', value: String(riskCount + 6), foot: `${riskCount} need action today`, icon: '↗', tone: 'amber', trend: '−2 from last week' }, { label: 'Inventory value', value: money(totalValue + 24180), foot: 'On hand + incoming', icon: '$', tone: 'violet', trend: '+2.1%' }, { label: 'Stockout exposure', value: money(atRisk), foot: 'Estimated at-risk value', icon: '⚠', tone: 'red', trend: 'Review now' }]
+  const tableRows = [...products].sort((a, b) => (a.stock / a.demand - b.stock / b.demand)).slice(0, 5)
+  return <>
+    <div className="section-kicker"><span>INVENTORY HEALTH</span><button className="filter-link" onClick={() => setPage('Inventory')}>All products <span>→</span></button></div>
+    <div className="kpi-grid">{cards.map(c => <div className="kpi-card" key={c.label}><div className="kpi-top"><span>{c.label}</span><span className={`kpi-icon ${c.tone}`}>{c.icon}</span></div><div className="kpi-value">{c.value}</div><div className="kpi-foot"><span className={c.tone === 'red' ? 'text-red' : ''}>{c.foot}</span><span className={`trend ${c.tone}`}>{c.trend}</span></div></div>)}</div>
+    <div className="analytics-grid"><section className="panel demand-panel"><div className="panel-heading"><div><h2>Demand overview</h2><p>Actual demand vs. forecast</p></div><select value={range} onChange={e => setRange(e.target.value)}><option>Last 7 days</option><option>Last 30 days</option><option>Last 90 days</option></select></div><div className="chart-legend"><span><i className="legend-blue"/> Actual demand</span><span><i className="legend-violet"/> Forecast</span></div><div className="chart-area"><ResponsiveContainer width="100%" height="100%"><AreaChart data={trend} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}><defs><linearGradient id="demandFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#5273e8" stopOpacity={.16}/><stop offset="100%" stopColor="#5273e8" stopOpacity={0}/></linearGradient></defs><CartesianGrid vertical={false} stroke="#edf0f5"/><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#9299a8', fontSize: 11 }}/><YAxis axisLine={false} tickLine={false} tick={{ fill: '#9299a8', fontSize: 11 }} tickFormatter={v => `${v}`}/><Tooltip contentStyle={{ border: '1px solid #e8ebf1', borderRadius: 10, fontSize: 12 }}/><Area type="monotone" dataKey="demand" stroke="#5979ed" strokeWidth={2.4} fill="url(#demandFill)"/><Line type="monotone" dataKey="forecast" stroke="#b176d8" strokeWidth={2} strokeDasharray="5 5" dot={false}/></AreaChart></ResponsiveContainer></div><div className="chart-summary"><span><b>+12.6%</b> demand vs. previous period</span><span className="summary-muted">Forecast accuracy <b>94.2%</b></span></div></section>
+      <section className="panel stock-panel"><div className="panel-heading"><div><h2>Stock coverage</h2><p>Inventory position vs. reorder threshold</p></div><button className="more-button" aria-label="More stock chart options">···</button></div><div className="chart-legend"><span><i className="legend-blue"/> Units on hand</span><span><i className="legend-dash"/> Reorder threshold</span></div><div className="chart-area stock-chart"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={inventoryTrend} margin={{ top: 8, right: 0, left: -23, bottom: 0 }}><CartesianGrid vertical={false} stroke="#edf0f5"/><XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: '#9299a8', fontSize: 11 }}/><YAxis axisLine={false} tickLine={false} tick={{ fill: '#9299a8', fontSize: 11 }}/><Tooltip contentStyle={{ border: '1px solid #e8ebf1', borderRadius: 10, fontSize: 12 }}/><Bar dataKey="stock" fill="#91a6fa" radius={[4, 4, 0, 0]} barSize={22}/><Line dataKey="reorder" stroke="#e8a34d" strokeWidth={2} strokeDasharray="5 4" dot={false}/></ComposedChart></ResponsiveContainer></div><div className="stock-foot"><span><i className="mini-dot green-dot"/> 142 healthy</span><span><i className="mini-dot amber-dot"/> 18 at risk</span><span><i className="mini-dot red-dot"/> 7 out of stock</span></div></section></div>
+    <div className="lower-grid"><section className="panel recommendations"><div className="panel-heading"><div><h2>Needs your attention</h2><p>Prioritized recommendations based on cover and lead time</p></div><button className="filter-link" onClick={() => setPage('Replenishment')}>View all <span>→</span></button></div><div className="table-wrap"><table><thead><tr><th>PRODUCT</th><th>ON HAND</th><th>COVER</th><th>RECOMMENDED</th><th>STATUS</th><th/></tr></thead><tbody>{tableRows.map(p => { const cover = Math.floor(p.stock / p.demand); return <tr key={p.sku} onClick={() => setSelected(p)}><td><div className="product-cell"><span className={`product-thumb ${p.category.toLowerCase()}`}>{p.category === 'Grocery' ? '◉' : p.category === 'Packaging' ? '▱' : '◈'}</span><span><b>{p.name}</b><small>{p.sku} <i>·</i> {p.category}</small></span></div></td><td>{p.stock} units</td><td><b className={cover < p.lead ? 'text-red' : ''}>{cover} days</b></td><td>{Math.max(0, Math.ceil((p.demand * p.lead + p.safety) * 1.5 - p.stock - p.incoming))} units</td><td><Status status={statusOf(p)}/></td><td><button className="row-arrow" aria-label={`View ${p.name}`}>↗</button></td></tr> })}</tbody></table></div><button className="table-footer-link" onClick={() => setPage('Replenishment')}>Review all recommendations <span>→</span></button></section>
+      <section className="panel category-panel"><div className="panel-heading"><div><h2>Inventory mix</h2><p>Current stock by category</p></div><button className="more-button" aria-label="More category options">···</button></div><div className="donut-wrap"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={[{ name: 'Grocery', value: 38 }, { name: 'Kitchen', value: 27 }, { name: 'Packaging', value: 21 }, { name: 'Home', value: 14 }]} dataKey="value" innerRadius={62} outerRadius={82} paddingAngle={3} stroke="none">{['#6986ed', '#7ccbb4', '#f2b95f', '#bd92d8'].map(c => <Cell key={c} fill={c}/>)}</Pie><Tooltip formatter={v => `${v}%`} contentStyle={{ border: '1px solid #e8ebf1', borderRadius: 10, fontSize: 12 }}/></PieChart></ResponsiveContainer><div className="donut-center"><b>1,284</b><span>products</span></div></div><div className="category-legend"><span><i style={{background:'#6986ed'}}/>Grocery <b>38%</b></span><span><i style={{background:'#7ccbb4'}}/>Kitchen <b>27%</b></span><span><i style={{background:'#f2b95f'}}/>Packaging <b>21%</b></span><span><i style={{background:'#bd92d8'}}/>Home <b>14%</b></span></div></section></div>
+  </>
+}
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function InventoryPage({ page, rows, category, setCategory, filter, setFilter, setSelected }: { page: string; rows: Product[]; category: string; setCategory: (v: string) => void; filter: string; setFilter: (v: string) => void; setSelected: (p: Product) => void }) {
+  const replenishment = page === 'Replenishment'
+  return <><div className="section-kicker"><span>{replenishment ? 'REPLENISHMENT WORKQUEUE' : 'PRODUCT CATALOG'} <b className="count-label">{rows.length} products</b></span><button className="button secondary small-button" onClick={() => { const csv = ['Product,SKU,Category,Stock,Daily Demand,Lead Time,Status', ...rows.map(p => `"${p.name}",${p.sku},${p.category},${p.stock},${p.demand},${p.lead},${statusOf(p)}`)].join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'stocksense-inventory.csv'; a.click(); URL.revokeObjectURL(a.href) }}>↓ <span>Export CSV</span></button></div>
+    <div className="kpi-grid mini-kpis"><div className="kpi-card"><div className="kpi-top"><span>{replenishment ? 'Open recommendations' : 'Tracked products'}</span><span className="kpi-icon blue">▤</span></div><div className="kpi-value">{replenishment ? rows.filter(p => statusOf(p) !== 'Healthy').length : '1,284'}</div><div className="kpi-foot"><span>{replenishment ? 'Across all categories' : '4 product categories'}</span></div></div><div className="kpi-card"><div className="kpi-top"><span>Below reorder point</span><span className="kpi-icon amber">↗</span></div><div className="kpi-value">{products.filter(p => ['Critical', 'Reorder now'].includes(statusOf(p))).length + 6}</div><div className="kpi-foot"><span>Requires purchasing review</span></div></div><div className="kpi-card"><div className="kpi-top"><span>Incoming units</span><span className="kpi-icon violet">↓</span></div><div className="kpi-value">720</div><div className="kpi-foot"><span>Across 3 purchase orders</span></div></div></div>
+    <section className="panel full-table-panel"><div className="table-toolbar"><div className="filter-tabs">{['All items','Critical','Reorder now','Watch','Healthy'].map(f => <button key={f} className={filter === f ? 'selected' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div><div className="table-filters"><select value={category} onChange={e => setCategory(e.target.value)}><option>All categories</option>{['Grocery','Kitchen','Packaging','Home'].map(c => <option key={c}>{c}</option>)}</select><button className="button secondary small-button" onClick={() => setFilter('All items')}>☷ <span>Filters</span></button></div></div>
+      <div className="table-wrap wide-table"><table><thead><tr><th>PRODUCT</th><th>SKU</th><th>CATEGORY</th><th>ON HAND</th><th>AVG. / DAY</th><th>LEAD TIME</th><th>REORDER POINT</th><th>{replenishment ? 'SUGGESTED ORDER' : 'STATUS'}</th><th/></tr></thead><tbody>{rows.map(p => { const reorder = Math.ceil(p.demand * p.lead + p.safety); const order = Math.max(0, Math.ceil(reorder * 1.5 - p.stock - p.incoming)); return <tr key={p.sku} onClick={() => setSelected(p)}><td><div className="product-cell"><span className={`product-thumb ${p.category.toLowerCase()}`}>{p.category === 'Grocery' ? '◉' : p.category === 'Packaging' ? '▱' : '◈'}</span><span><b>{p.name}</b><small>{p.supplier}</small></span></div></td><td className="muted-code">{p.sku}</td><td>{p.category}</td><td><b>{p.stock}</b> <small>units</small></td><td>{p.demand.toFixed(1)}</td><td>{p.lead} days</td><td>{reorder} units</td><td>{replenishment ? <b className="order-quantity">{order || '—'} {order ? 'units' : ''}</b> : <Status status={statusOf(p)}/>}</td><td><button className="row-arrow" aria-label="Open product details">↗</button></td></tr>})}</tbody></table>{rows.length === 0 && <div className="empty-state">No products match these filters. Try adjusting your search.</div>}</div><div className="table-bottom"><span>Showing {rows.length} of {rows.length} products</span><div><button disabled>← Previous</button><button className="page-number">1</button><button disabled>Next →</button></div></div>
+    </section></>
+}
+
+function ScenarioPage({ scenarios, demandChange, setDemandChange, leadChange, setLeadChange }: { scenarios: (Product & { adjustedDemand: number; adjustedLead: number; reorder: number; position: number; order: number; oldReorder: number })[]; demandChange: number; setDemandChange: (n: number) => void; leadChange: number; setLeadChange: (n: number) => void }) {
+  const atRisk = scenarios.filter(p => p.position < p.reorder).length
+  const totalOrder = scenarios.reduce((s, p) => s + p.order, 0)
+  const lineData = scenarios.slice(0, 6).map(p => ({ name: p.name.split(' ·')[0].replace('Organic ', ''), baseline: p.oldReorder, scenario: p.reorder, onHand: p.position }))
+  return <><div className="scenario-banner"><div className="scenario-banner-icon">⟳</div><div><b>Scenario planning workspace</b><p>Adjust the assumptions below to see how your replenishment plan responds. Your live inventory data stays unchanged.</p></div><span className="scenario-tag">WHAT-IF ANALYSIS</span></div>
+    <div className="scenario-layout"><section className="panel controls-panel"><div className="panel-heading"><div><h2>Scenario assumptions</h2><p>Set the conditions to model</p></div><span className="reset-link" onClick={() => {setDemandChange(25);setLeadChange(3)}}>Reset</span></div><div className="scenario-control"><div className="control-label"><span>Demand increase</span><b>{demandChange}%</b></div><input type="range" min="0" max="100" step="5" value={demandChange} onChange={e => setDemandChange(Number(e.target.value))}/><div className="range-labels"><span>No change</span><span>+100%</span></div><p>Simulate a rise in customer demand across all products.</p></div><div className="scenario-control"><div className="control-label"><span>Supplier delay</span><b>{leadChange} days</b></div><input type="range" min="0" max="21" step="1" value={leadChange} onChange={e => setLeadChange(Number(e.target.value))}/><div className="range-labels"><span>No delay</span><span>+21 days</span></div><p>Extend supplier lead times to model a shipping disruption.</p></div><div className="assumption-note"><b>Model assumptions</b><span>Safety stock remains fixed. Demand increase applies uniformly. Existing inbound purchase orders are included in inventory position.</span></div></section>
+      <div className="scenario-results"><div className="scenario-metric-row"><div className="scenario-metric"><span>Products below reorder point</span><b>{atRisk}<small> / {scenarios.length}</small></b><em className={atRisk ? 'risk-up' : ''}>Under this scenario</em></div><div className="scenario-metric"><span>Suggested units to order</span><b>{totalOrder.toLocaleString()}</b><em>Across selected products</em></div><div className="scenario-metric"><span>Demand multiplier</span><b>{(1 + demandChange / 100).toFixed(2)}×</b><em>Baseline daily demand</em></div></div>
+        <section className="panel scenario-chart-panel"><div className="panel-heading"><div><h2>Reorder point impact</h2><p>Baseline compared with your scenario assumptions</p></div></div><div className="chart-legend"><span><i className="legend-blue"/> Baseline reorder point</span><span><i className="legend-violet"/> Scenario reorder point</span><span><i className="legend-dash"/> Inventory position</span></div><div className="chart-area scenario-chart"><ResponsiveContainer width="100%" height="100%"><ComposedChart data={lineData} margin={{ top: 12, right: 12, left: -20, bottom: 28 }}><CartesianGrid vertical={false} stroke="#edf0f5"/><XAxis dataKey="name" axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end" tick={{ fill: '#9299a8', fontSize: 10 }}/><YAxis axisLine={false} tickLine={false} tick={{ fill: '#9299a8', fontSize: 11 }}/><Tooltip contentStyle={{ border: '1px solid #e8ebf1', borderRadius: 10, fontSize: 12 }}/><Bar dataKey="baseline" fill="#91a6fa" radius={[4,4,0,0]} barSize={18}/><Bar dataKey="scenario" fill="#bd92d8" radius={[4,4,0,0]} barSize={18}/><Line dataKey="onHand" stroke="#e8a34d" strokeDasharray="5 4" dot={false}/></ComposedChart></ResponsiveContainer></div></section>
+        <section className="panel scenario-table"><div className="panel-heading"><div><h2>Updated recommendations</h2><p>Calculated from adjusted demand and lead times</p></div></div><div className="table-wrap"><table><thead><tr><th>PRODUCT</th><th>POSITION</th><th>NEW REORDER POINT</th><th>ORDER QTY</th><th>STATUS</th></tr></thead><tbody>{scenarios.map(p => <tr key={p.sku}><td><b>{p.name}</b><small className="table-subline">{p.sku}</small></td><td>{p.position} units</td><td>{Math.ceil(p.reorder)} units <small className="was-value">was {Math.ceil(p.oldReorder)}</small></td><td><b className="order-quantity">{p.order || '—'}{p.order ? ' units' : ''}</b></td><td><Status status={statusOf(p, p.reorder)}/></td></tr>)}</tbody></table></div></section></div></div>
+    <div className="dynamic-summary"><span className="summary-icon">✦</span><span><b>Scenario summary</b><p>Demand increased by {demandChange}% and supplier lead times extended by {leadChange} days. {atRisk ? `${atRisk} of ${scenarios.length} products are projected below their revised reorder point;` : 'All selected products remain above their revised reorder point.'} the plan recommends ordering {totalOrder.toLocaleString()} units to restore target coverage.</p></span></div>
+  </>
+}
+
+function InsightsPage({ page, rows, setPage }: { page: string; rows: Product[]; setPage: (p: string) => void }) {
+  const [saved, setSaved] = useState(false)
+  const demandData = days.map((day, i) => ({ day, actual: [92,108,98,125,117,145,132][i], predicted: [96,104,101,119,120,137,135][i], error: [4,-4,3,-6,3,-8,3][i] }))
+  const title = page === 'Demand forecasting' ? 'Demand signal' : page === 'Anomaly detection' ? 'Recent signals' : page === 'Forecast evaluation' ? 'Forecast performance' : page === 'Reports' ? 'Inventory summary report' : 'Workspace settings'
+  if (page === 'Settings') return <section className="panel settings-panel"><div className="panel-heading"><div><h2>Planning preferences</h2><p>Configure default assumptions for your workspace</p></div></div>{[['Target service level','95%'],['Default forecast horizon','30 days'],['Default holding cost','$2.40 / unit / year'],['Default ordering cost','$35.00 / order'],['Currency','USD ($)']].map(([label,value])=><label className="setting-row" key={label}><span><b>{label}</b><small>Used in inventory planning calculations</small></span><select defaultValue={value}><option>{value}</option><option>{label === 'Target service level' ? '98%' : value}</option><option>{label === 'Target service level' ? '90%' : value}</option></select></label>)}<button className="button primary" onClick={() => setSaved(true)}>{saved ? '✓ Preferences saved' : 'Save preferences'}</button></section>
+  return <><div className="insight-summary"><div className="insight-highlight"><span>{page === 'Forecast evaluation' ? 'DEMONSTRATION DATA' : 'LIVE WORKSPACE SIGNALS'}</span><h2>{page === 'Anomaly detection' ? '2 unusual demand patterns' : page === 'Forecast evaluation' ? 'Forecasts are tracking close to actual demand' : page === 'Reports' ? 'A clear view of inventory health' : 'A steady demand signal this week'}</h2><p>{page === 'Forecast evaluation' ? 'Illustrative holdout comparison only. These values are not measured production results.' : page === 'Anomaly detection' ? 'Review recent deviations before they affect your replenishment plan.' : 'Use the filters and charts below to explore your inventory performance.'}</p><button className="button secondary small-button" onClick={() => setPage('Replenishment')}>Review recommendations →</button></div><div className="insight-stat"><span>Forecast accuracy</span><b>94.2%</b><small>Demonstration estimate</small></div><div className="insight-stat"><span>Mean abs. error</span><b>5.8 units</b><small>Last 30 days · illustrative</small></div></div>
+    <section className="panel insight-chart-panel"><div className="panel-heading"><div><h2>{title}</h2><p>{page === 'Forecast evaluation' ? 'Actual vs. predicted demand · chronological holdout' : 'Daily units · sample workspace data'}</p></div><select><option>Last 7 days</option><option>Last 30 days</option></select></div><div className="chart-legend"><span><i className="legend-blue"/> Actual demand</span><span><i className="legend-violet"/> Predicted demand</span></div><div className="chart-area insight-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={demandData}><CartesianGrid vertical={false} stroke="#edf0f5"/><XAxis dataKey="day" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false}/><Tooltip contentStyle={{ border: '1px solid #e8ebf1', borderRadius: 10, fontSize: 12 }}/><Area type="monotone" dataKey="actual" stroke="#5979ed" fill="#5979ed" fillOpacity={.09}/><Line type="monotone" dataKey="predicted" stroke="#b176d8" strokeWidth={2} strokeDasharray="5 4" dot={false}/></AreaChart></ResponsiveContainer></div></section>
+    <div className="lower-grid"><section className="panel insight-list"><div className="panel-heading"><div><h2>{page === 'Anomaly detection' ? 'Signals to review' : 'Products to watch'}</h2><p>Based on current inventory position</p></div></div>{rows.slice(0,4).map(p=><div className="signal-row" key={p.sku}><span className={`product-thumb ${p.category.toLowerCase()}`}>◈</span><span><b>{p.name}</b><small>{p.sku} · {p.stock} units on hand</small></span><Status status={statusOf(p)}/></div>)}</section><section className="panel error-panel"><div className="panel-heading"><div><h2>Forecast error</h2><p>Difference between predicted and actual</p></div></div><div className="chart-area error-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={demandData}><CartesianGrid vertical={false} stroke="#edf0f5"/><XAxis dataKey="day" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false}/><Tooltip/><Bar dataKey="error" radius={[4,4,0,0]}>{demandData.map((d,i)=><Cell key={i} fill={d.error >= 0 ? '#7ccbb4' : '#e9a2a2'}/>)}</Bar></BarChart></ResponsiveContainer></div><div className="demo-note">Evaluation figures are illustrative demo data.</div></section></div></>
 }
 
 export default App
