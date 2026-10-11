@@ -21,6 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Create frontend .env from example
+        run: cp frontend/.env.example frontend/.env
       - name: Build frontend image
         run: docker compose build frontend
       - name: Run ESLint

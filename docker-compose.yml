@@ -24,7 +24,8 @@ services:
     container_name: hackathon_frontend
     restart: unless-stopped
     env_file:
-      - ./frontend/.env
+      - path: ./frontend/.env
+        required: false
     ports:
       - "5173:5173"
     volumes:
