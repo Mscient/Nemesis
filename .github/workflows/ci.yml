@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Create root .env from example
+        run: cp .env.example .env
       - name: Build backend image
         run: docker compose build backend
       - name: Run ruff
@@ -37,6 +39,8 @@ jobs:
       ANTHROPIC_API_KEY: "test-key"
     steps:
       - uses: actions/checkout@v4
+      - name: Create root .env from example
+        run: cp .env.example .env
       - name: Build backend image
         run: docker compose build backend
       - name: Run tests

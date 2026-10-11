@@ -6,7 +6,8 @@ services:
     container_name: hackathon_backend
     restart: unless-stopped
     env_file:
-      - .env
+      - path: .env
+        required: false
     environment:
       DATABASE_URL: "sqlite:////data/db.sqlite3"
     ports:
