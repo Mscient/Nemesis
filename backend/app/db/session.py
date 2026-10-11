@@ -1,5 +1,6 @@
 """
-SQLAlchemy async session factory and table-creation helper — B3.
+SQLAlchemy async session factory and table-creation helper.
+Configured for PostgreSQL via asyncpg.
 """
 from __future__ import annotations
 
@@ -21,6 +22,6 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def create_tables() -> None:
-    """Create all tables (used at startup for SQLite dev; use Alembic for Postgres)."""
+    """Create all tables defined in the ORM metadata if they don't exist."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

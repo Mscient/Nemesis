@@ -1,0 +1,64 @@
+# render.yaml — Infrastructure-as-Code for Render.com
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Deploy steps:
+#   1. Push this file to your GitHub repo.
+#   2. Go to Render Dashboard → New → Blueprint.
+#   3. Connect your repo — Render will detect this file automatically.
+#   4. Set the secret env vars (DATABASE_URL, LLM_API_KEY) in the Render dashboard.
+
+services:
+  # ── Backend: FastAPI (Docker) ────────────────────────────────────────────────
+  - type: web
+    name: stocksense-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .                  # repo root — needed for COPY core/ and COPY ai/
+    plan: free                        # change to "starter" or higher for production
+    region: oregon                    # us-west-2; change as needed
+    branch: data                      # deploy from the data branch
+
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stocksense-db
+          property: connectionString   # Render gives postgres:// — config.py auto-upgrades to postgresql+asyncpg://
+      - key: AI_ENABLED
+        value: "false"
+      - key: LLM_PROVIDER
+        value: mock
+      - key: LLM_MODEL
+        value: mock-model
+      - key: LLM_API_KEY
+        sync: false                    # set manually in Render dashboard
+      - key: MOCK_MODE
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+
+    healthCheckPath: /api/health
+
+  # ── Frontend: Vite/React (Docker / Static) ───────────────────────────────────
+  - type: web
+    name: stocksense-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    plan: free
+    region: oregon
+    branch: data
+
+    envVars:
+      - key: VITE_API_BASE_URL
+        fromService:
+          name: stocksense-backend
+          type: web
+          property: host              # Render injects the backend's public URL
+
+# ── Managed PostgreSQL database ──────────────────────────────────────────────
+databases:
+  - name: stocksense-db
+    databaseName: stocksense
+    user: stocksense
+    plan: free                        # 90-day free tier on Render
+    region: oregon

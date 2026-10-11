@@ -15,7 +15,9 @@ services:
       retries: 10
 
   backend:
-    build: ./backend
+    build:
+      context: .                  # repo root — so COPY core/ and COPY ai/ work
+      dockerfile: backend/Dockerfile
     env_file: .env
     environment:
       DATABASE_URL: postgresql+asyncpg://stocksense:stocksense@db:5432/stocksense
@@ -28,13 +30,13 @@ services:
       - ./data:/app/data:ro
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "5173:80"
     depends_on:
       - backend
-    environment:
-      VITE_API_BASE_URL: http://localhost:8000
 
 volumes:
   pgdata:

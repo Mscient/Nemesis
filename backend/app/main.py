@@ -21,9 +21,8 @@ logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.I
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Create DB tables on startup (SQLite dev mode). Use Alembic for Postgres."""
-    if "sqlite" in settings.database_url:
-        await create_tables()
+    """Create DB tables on startup via SQLAlchemy metadata."""
+    await create_tables()
     yield
 
 
