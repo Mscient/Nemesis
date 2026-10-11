@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  lint-backend:
+    name: Ruff Lint (backend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker compose build backend
+      - name: Run ruff
+        run: docker compose run --rm backend uv run ruff check app tests
+
+  lint-frontend:
+    name: ESLint (frontend)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build frontend image
+        run: docker compose build frontend
+      - name: Run ESLint
+        run: docker compose run --rm frontend pnpm lint
+
+  test-backend:
+    name: Pytest (backend)
+    runs-on: ubuntu-latest
+    env:
+      USE_MOCK_AI: "true"
+      DATABASE_URL: "sqlite:////tmp/test.sqlite3"
+      ANTHROPIC_API_KEY: "test-key"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker compose build backend
+      - name: Run tests
+        run: docker compose run --rm -e USE_MOCK_AI=true -e DATABASE_URL=sqlite:////tmp/test.sqlite3 -e ANTHROPIC_API_KEY=test-key backend uv run pytest -v

@@ -1,0 +1,10 @@
+.git
+.env
+*.md
+node_modules
+__pycache__
+.venv
+*.sqlite3
+.pytest_cache
+.ruff_cache
+dist
