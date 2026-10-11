@@ -31,7 +31,7 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend:/app
-      - /app/node_modules   # anonymous volume so container node_modules win
+      - /app/node_modules # anonymous volume so container node_modules win
     networks:
       - app_net
     depends_on:
