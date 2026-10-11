@@ -112,7 +112,7 @@ def holt_winters_forecast(
                 seasonal="add",
                 seasonal_periods=_SEASON_PERIOD,
                 initialization_method="estimated",
-            ).fit(optimized=True, disp=False)
+            ).fit(optimized=True)
             preds = np.clip(model.forecast(horizon), 0, None)
             model_name = "holt_winters"
         else:
@@ -122,7 +122,7 @@ def holt_winters_forecast(
                 trend=None,
                 seasonal=None,
                 initialization_method="estimated",
-            ).fit(optimized=True, disp=False)
+            ).fit(optimized=True)
             preds = np.clip(model.forecast(horizon), 0, None)
             model_name = "exp_smoothing"
     except Exception:
