@@ -1,0 +1,30 @@
+[
+  {
+    "id": 1,
+    "sku": "WATER-500",
+    "date": "2026-09-03",
+    "value": 35.0,
+    "expected_value": 10.0,
+    "robust_z": 4.2,
+    "flags": ["high_spike"],
+    "cls": "promotion",
+    "treatment": "keep_with_promo_flag",
+    "source": "rule",
+    "status": "open",
+    "rationale": "Value 3.5x expected; likely promotion event."
+  },
+  {
+    "id": 2,
+    "sku": "WATER-500",
+    "date": "2026-09-15",
+    "value": -2.0,
+    "expected_value": 10.0,
+    "robust_z": 5.1,
+    "flags": ["negative_value"],
+    "cls": "data_error",
+    "treatment": "exclude",
+    "source": "rule",
+    "status": "open",
+    "rationale": "Negative sales are physically impossible."
+  }
+]

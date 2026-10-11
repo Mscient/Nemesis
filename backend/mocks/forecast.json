@@ -1,0 +1,14 @@
+{
+  "sku": "WATER-500",
+  "horizon_days": 14,
+  "model_used": "holt_winters",
+  "avg_daily_demand": 10.0,
+  "sigma_daily": 4.0,
+  "predictions": [10.1, 9.8, 10.3, 10.0, 9.9, 10.2, 10.1, 9.7, 10.4, 10.0, 9.8, 10.1, 10.2, 9.9],
+  "confidence": "medium",
+  "warnings": [],
+  "evaluation": [
+    {"model_name": "moving_average", "mae": 3.1, "rmse": 4.0, "wape": 0.31, "bias": 0.2},
+    {"model_name": "holt_winters",   "mae": 2.4, "rmse": 3.1, "wape": 0.24, "bias": -0.1}
+  ]
+}
