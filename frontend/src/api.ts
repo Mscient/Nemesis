@@ -3,6 +3,45 @@
  * All calls go through Vite's /api proxy → http://localhost:8000
  */
 
+// ─── Auth Shapes ─────────────────────────────────────────────────────────────
+
+export interface User {
+  id: number
+  email: string
+  full_name: string | null
+  is_active: boolean
+}
+
+export interface AuthResponse {
+  access_token: string
+  token_type: string
+  user?: User | null
+}
+
+export const authStorage = {
+  getToken: (): string | null => localStorage.getItem('stocksense_token'),
+  setToken: (token: string | null) => {
+    if (token) localStorage.setItem('stocksense_token', token)
+    else localStorage.removeItem('stocksense_token')
+  },
+  getUser: (): User | null => {
+    const raw = localStorage.getItem('stocksense_user')
+    try {
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  },
+  setUser: (user: User | null) => {
+    if (user) localStorage.setItem('stocksense_user', JSON.stringify(user))
+    else localStorage.removeItem('stocksense_user')
+  },
+  clear: () => {
+    localStorage.removeItem('stocksense_token')
+    localStorage.removeItem('stocksense_user')
+  },
+}
+
 // ─── Backend shape (matches Pydantic schemas) ──────────────────────────────
 
 export interface SkuSummary {
@@ -69,8 +108,26 @@ export interface HealthResponse {
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(path, options)
-  if (!res.ok) throw new Error(`${options?.method ?? 'GET'} ${path} → ${res.status}`)
+  const token = authStorage.getToken()
+  const headers: Record<string, string> = {
+    ...(options?.headers as Record<string, string>),
+  }
+  if (token && !headers['Authorization']) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  const res = await fetch(path, { ...options, headers })
+  if (!res.ok) {
+    if (res.status === 401 && path !== '/api/auth/login' && path !== '/api/auth/register') {
+      authStorage.clear()
+    }
+    const errBody = await res.json().catch(() => null)
+    const msg =
+      errBody?.detail ||
+      errBody?.error?.message ||
+      `${options?.method ?? 'GET'} ${path} → ${res.status}`
+    throw new Error(msg)
+  }
   return res.json() as Promise<T>
 }
 
@@ -78,6 +135,39 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => apiFetch<HealthResponse>('/api/health'),
+
+  /** Auth endpoints */
+  login: async (email: string, password: string): Promise<AuthResponse> => {
+    const res = await apiFetch<AuthResponse>('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    authStorage.setToken(res.access_token)
+    if (res.user) authStorage.setUser(res.user)
+    return res
+  },
+
+  register: async (email: string, password: string, fullName?: string): Promise<AuthResponse> => {
+    const res = await apiFetch<AuthResponse>('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, full_name: fullName }),
+    })
+    authStorage.setToken(res.access_token)
+    if (res.user) authStorage.setUser(res.user)
+    return res
+  },
+
+  me: async (): Promise<User> => {
+    const user = await apiFetch<User>('/api/auth/me')
+    authStorage.setUser(user)
+    return user
+  },
+
+  logout: () => {
+    authStorage.clear()
+  },
 
   /** List all SKUs with status */
   listSkus: () => apiFetch<SkuSummary[]>('/api/skus'),
@@ -134,9 +224,9 @@ export function toProduct(summary: SkuSummary, detail?: SkuDetail): Product {
     category: categoryFromSku(summary.sku),
     supplier: 'Unknown Supplier',
     stock: Math.round(summary.on_hand),
-    demand: 5,                            // overridden by forecast when available
+    demand: 5, // overridden by forecast when available
     lead: params?.lead_time_days ?? 7,
-    safety: 20,                           // overridden by forecast when available
+    safety: 20, // overridden by forecast when available
     price: params?.unit_cost ?? 10,
     incoming: Math.round(summary.on_order),
   }

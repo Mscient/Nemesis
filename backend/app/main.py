@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 
 from app.config import settings
 from app.db.session import create_tables
-from app.routers import health, skus, datasets, anomalies, scenarios, ai_routes
+from app.routers import health, skus, datasets, anomalies, scenarios, ai_routes, auth
 
 logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
 
@@ -95,3 +95,4 @@ app.include_router(datasets.router, prefix="/api")
 app.include_router(anomalies.router, prefix="/api")
 app.include_router(scenarios.router, prefix="/api")
 app.include_router(ai_routes.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")

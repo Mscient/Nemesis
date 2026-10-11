@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import './App.css'
-import { api, toProduct, type Product as ApiProduct } from './api'
+import { api, toProduct, authStorage, type Product as ApiProduct, type User } from './api'
 
 // Re-export from api.ts so components below can still use the local name
 type Product = ApiProduct
@@ -27,6 +27,23 @@ function App() {
   const [leadChange, setLeadChange] = useState(3)
   const [notice, setNotice] = useState('')
   const [range, setRange] = useState('Last 7 days')
+
+  // ── Auth state ────────────────────────────────────────────────────────────
+  const [user, setUser] = useState<User | null>(authStorage.getUser())
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  useEffect(() => {
+    const token = authStorage.getToken()
+    if (token) {
+      api.me()
+        .then(u => setUser(u))
+        .catch(() => {
+          authStorage.clear()
+          setUser(null)
+        })
+    }
+  }, [])
 
   // ── Live data from backend ────────────────────────────────────────────────
   const [products, setProducts] = useState<Product[]>([])
@@ -73,13 +90,56 @@ function App() {
       <div className="brand"><span className="brand-mark">S</span><span>stocksense<span className="brand-dot">.</span><small>INVENTORY INTELLIGENCE</small></span></div>
       <div className="workspace-switch"><span className="workspace-avatar">N</span><span><b>Northstar Goods</b><small>Growth plan</small></span><span className="chevron">⌄</span></div>
       {nav.map(section => <div className="nav-section" key={section.group}><div className="nav-label">{section.group}</div>{section.items.map(([name, icon]) => <button key={name} className={`nav-item ${page === name ? 'active' : ''}`} onClick={() => setPage(name)}><span className="nav-icon">{icon}</span>{name}{name === 'Replenishment' && <span className="nav-count">{riskCount}</span>}</button>)}</div>)}
-      <div className="sidebar-bottom"><button className={`nav-item ${page === 'Settings' ? 'active' : ''}`} onClick={() => setPage('Settings')}><span className="nav-icon">⚙</span>Settings</button><div className="user-card"><div className="avatar">AM</div><span><b>Alex Morgan</b><small>Inventory manager</small></span><button className="more-button" aria-label="User options" onClick={() => openNotice('Profile settings are up to date')}>···</button></div></div>
+      <div className="sidebar-bottom">
+        <button className={`nav-item ${page === 'Settings' ? 'active' : ''}`} onClick={() => setPage('Settings')}><span className="nav-icon">⚙</span>Settings</button>
+        {user ? (
+          <div className="user-card" onClick={() => setUserMenuOpen(!userMenuOpen)}>
+            <div className="avatar">{(user.full_name || user.email).slice(0, 2).toUpperCase()}</div>
+            <span><b>{user.full_name || user.email.split('@')[0]}</b><small>{user.email}</small></span>
+            <button className="more-button" aria-label="User options">···</button>
+            {userMenuOpen && (
+              <div className="user-dropdown" onClick={e => e.stopPropagation()}>
+                <div style={{ padding: '6px 10px', fontSize: '10px', color: '#8891a4', borderBottom: '1px solid #edf1f7', marginBottom: '4px' }}>
+                  Signed in as <b>{user.email}</b>
+                </div>
+                <button className="user-dropdown-item danger" onClick={() => {
+                  api.logout()
+                  setUser(null)
+                  setUserMenuOpen(false)
+                  openNotice('Signed out successfully')
+                }}>
+                  <span>🚪</span> Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ marginTop: '12px', borderTop: '1px solid #eff0f4', paddingTop: '10px' }}>
+            <button className="button primary full-button" style={{ height: '32px', fontSize: '10px' }} onClick={() => setShowAuthModal(true)}>
+              <span>🔒 Sign In</span> <span>→</span>
+            </button>
+          </div>
+        )}
+      </div>
     </aside>
     <main className="main-area">
-      <header className="topbar"><div className="breadcrumb">Workspace <span>/</span> <b>{pageTitle}</b></div><div className="top-actions"><label className="global-search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search products, SKUs..." /><kbd>⌘ K</kbd></label><button className="icon-button notification" aria-label="Notifications" onClick={() => openNotice(`${riskCount} products need your attention`)}>♧<i /></button><div className="top-divider"/><div className={`sync-state${backendError ? ' sync-error' : ''}`}><i/> {syncLabel}</div></div></header>
+      <header className="topbar">
+        <div className="breadcrumb">Workspace <span>/</span> <b>{pageTitle}</b></div>
+        <div className="top-actions">
+          <label className="global-search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search products, SKUs..." /><kbd>⌘ K</kbd></label>
+          <button className="icon-button notification" aria-label="Notifications" onClick={() => openNotice(`${riskCount} products need your attention`)}>♧<i /></button>
+          <div className="top-divider"/>
+          <div className={`sync-state${backendError ? ' sync-error' : ''}`}><i/> {syncLabel}</div>
+          {!user && (
+            <button className="button primary small-button" style={{ marginLeft: 6 }} onClick={() => setShowAuthModal(true)}>
+              <span>Sign In</span>
+            </button>
+          )}
+        </div>
+      </header>
       {loading && <div className="api-banner api-loading">⟳ &nbsp;Loading live inventory data…</div>}
       {!loading && backendError && <div className="api-banner api-error">⚠ &nbsp;Backend unreachable — showing empty inventory. Make sure <code>fastapi dev main.py</code> is running in <code>backend/app</code>.</div>}
-      <div className="page-content"><div className="page-heading"><div><div className="eyebrow">SUNDAY, OCTOBER 11, 2026 <span className="live-pill"><i/> DEMO DATA</span></div><h1>{page === 'Overview' ? 'Good morning, Alex' : pageTitle}</h1><p>{page === 'Overview' ? 'Here’s what’s happening across your inventory today.' : page === 'Scenario simulator' ? 'Stress-test your inventory plan against changing conditions.' : `Monitor and manage your ${pageTitle.toLowerCase()} in one place.`}</p></div><div className="heading-actions"><button className="button secondary" onClick={() => openNotice('Your inventory data is up to date')}>⟳ <span>Sync data</span></button><button className="button primary" onClick={() => page === 'Replenishment' ? openNotice('Purchase order draft created') : setPage('Replenishment')}>＋ <span>{page === 'Replenishment' ? 'Create purchase order' : 'Plan replenishment'}</span></button></div></div>
+      <div className="page-content"><div className="page-heading"><div><div className="eyebrow">SUNDAY, OCTOBER 11, 2026 <span className="live-pill"><i/> DEMO DATA</span></div><h1>{page === 'Overview' ? `Good morning, ${user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Alex'}` : pageTitle}</h1><p>{page === 'Overview' ? 'Here’s what’s happening across your inventory today.' : page === 'Scenario simulator' ? 'Stress-test your inventory plan against changing conditions.' : `Monitor and manage your ${pageTitle.toLowerCase()} in one place.`}</p></div><div className="heading-actions"><button className="button secondary" onClick={() => openNotice('Your inventory data is up to date')}>⟳ <span>Sync data</span></button><button className="button primary" onClick={() => page === 'Replenishment' ? openNotice('Purchase order draft created') : setPage('Replenishment')}>＋ <span>{page === 'Replenishment' ? 'Create purchase order' : 'Plan replenishment'}</span></button></div></div>
       {page === 'Overview' && <Overview products={products} riskCount={riskCount} atRisk={atRisk} setPage={setPage} range={range} setRange={setRange} setSelected={setSelected} />}
       {(page === 'Inventory' || page === 'Replenishment') && <InventoryPage page={page} rows={rows} category={category} setCategory={setCategory} filter={filter} setFilter={setFilter} setSelected={setSelected} />}
       {page === 'Scenario simulator' && <ScenarioPage scenarios={scenarios} demandChange={demandChange} setDemandChange={setDemandChange} leadChange={leadChange} setLeadChange={setLeadChange} />}
@@ -88,6 +148,16 @@ function App() {
     </main>
     {selected && <div className="modal-backdrop" onClick={() => setSelected(null)}><section className="detail-modal" onClick={e => e.stopPropagation()}><button className="modal-close" onClick={() => setSelected(null)}>×</button><div className="eyebrow">PRODUCT DETAILS</div><h2>{selected.name}</h2><div className="detail-sku">{selected.sku} <span>·</span> {selected.category}</div><div className="detail-status"><Status status={statusOf(selected)}/><span>Supplier: {selected.supplier}</span></div><div className="detail-grid"><Metric label="On hand" value={`${selected.stock} units`}/><Metric label="Incoming" value={`${selected.incoming} units`}/><Metric label="Avg. daily demand" value={`${selected.demand} units`}/><Metric label="Lead time" value={`${selected.lead} days`}/><Metric label="Reorder point" value={`${Math.ceil(selected.demand * selected.lead + selected.safety)} units`}/><Metric label="Safety stock" value={`${selected.safety} units`}/></div><div className="formula-note">Reorder point = expected demand during lead time + safety stock</div><button className="button primary full-button" onClick={() => {setSelected(null); setPage('Replenishment')}}>View replenishment plan <span>→</span></button></section></div>}
     {notice && <div role="status" className="toast">✓ &nbsp;{notice}</div>}
+    {showAuthModal && (
+      <AuthModal
+        onSuccess={(u) => {
+          setUser(u)
+          setShowAuthModal(false)
+          openNotice(`Welcome back, ${u.full_name || u.email}!`)
+        }}
+        onClose={() => setShowAuthModal(false)}
+      />
+    )}
   </div>
 }
 
@@ -138,6 +208,149 @@ function InsightsPage({ page, rows, setPage }: { page: string; rows: Product[]; 
   return <><div className="insight-summary"><div className="insight-highlight"><span>{page === 'Forecast evaluation' ? 'DEMONSTRATION DATA' : 'LIVE WORKSPACE SIGNALS'}</span><h2>{page === 'Anomaly detection' ? '2 unusual demand patterns' : page === 'Forecast evaluation' ? 'Forecasts are tracking close to actual demand' : page === 'Reports' ? 'A clear view of inventory health' : 'A steady demand signal this week'}</h2><p>{page === 'Forecast evaluation' ? 'Illustrative holdout comparison only. These values are not measured production results.' : page === 'Anomaly detection' ? 'Review recent deviations before they affect your replenishment plan.' : 'Use the filters and charts below to explore your inventory performance.'}</p><button className="button secondary small-button" onClick={() => setPage('Replenishment')}>Review recommendations →</button></div><div className="insight-stat"><span>Forecast accuracy</span><b>94.2%</b><small>Demonstration estimate</small></div><div className="insight-stat"><span>Mean abs. error</span><b>5.8 units</b><small>Last 30 days · illustrative</small></div></div>
     <section className="panel insight-chart-panel"><div className="panel-heading"><div><h2>{title}</h2><p>{page === 'Forecast evaluation' ? 'Actual vs. predicted demand · chronological holdout' : 'Daily units · sample workspace data'}</p></div><select><option>Last 7 days</option><option>Last 30 days</option></select></div><div className="chart-legend"><span><i className="legend-blue"/> Actual demand</span><span><i className="legend-violet"/> Predicted demand</span></div><div className="chart-area insight-chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={demandData}><CartesianGrid vertical={false} stroke="#edf0f5"/><XAxis dataKey="day" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false}/><Tooltip contentStyle={{ border: '1px solid #e8ebf1', borderRadius: 10, fontSize: 12 }}/><Area type="monotone" dataKey="actual" stroke="#5979ed" fill="#5979ed" fillOpacity={.09}/><Line type="monotone" dataKey="predicted" stroke="#b176d8" strokeWidth={2} strokeDasharray="5 4" dot={false}/></AreaChart></ResponsiveContainer></div></section>
     <div className="lower-grid"><section className="panel insight-list"><div className="panel-heading"><div><h2>{page === 'Anomaly detection' ? 'Signals to review' : 'Products to watch'}</h2><p>Based on current inventory position</p></div></div>{rows.slice(0,4).map(p=><div className="signal-row" key={p.sku}><span className={`product-thumb ${p.category.toLowerCase()}`}>◈</span><span><b>{p.name}</b><small>{p.sku} · {p.stock} units on hand</small></span><Status status={statusOf(p)}/></div>)}</section><section className="panel error-panel"><div className="panel-heading"><div><h2>Forecast error</h2><p>Difference between predicted and actual</p></div></div><div className="chart-area error-chart"><ResponsiveContainer width="100%" height="100%"><BarChart data={demandData}><CartesianGrid vertical={false} stroke="#edf0f5"/><XAxis dataKey="day" axisLine={false} tickLine={false}/><YAxis axisLine={false} tickLine={false}/><Tooltip/><Bar dataKey="error" radius={[4,4,0,0]}>{demandData.map((d,i)=><Cell key={i} fill={d.error >= 0 ? '#7ccbb4' : '#e9a2a2'}/>)}</Bar></BarChart></ResponsiveContainer></div><div className="demo-note">Evaluation figures are illustrative demo data.</div></section></div></>
+}
+
+function AuthModal({
+  onSuccess,
+  onClose,
+}: {
+  onSuccess: (user: User) => void
+  onClose?: () => void
+}) {
+  const [tab, setTab] = useState<'login' | 'register'>('login')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      if (tab === 'login') {
+        const res = await api.login(email, password)
+        if (res.user) onSuccess(res.user)
+        else {
+          const u = await api.me()
+          onSuccess(u)
+        }
+      } else {
+        const res = await api.register(email, password, fullName || undefined)
+        if (res.user) onSuccess(res.user)
+        else {
+          const u = await api.me()
+          onSuccess(u)
+        }
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Authentication failed. Please check your credentials.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fillDemo = async () => {
+    setEmail('admin@stocksense.io')
+    setPassword('password123')
+    setError('')
+    setLoading(true)
+    try {
+      const res = await api.login('admin@stocksense.io', 'password123')
+      if (res.user) onSuccess(res.user)
+      else {
+        const u = await api.me()
+        onSuccess(u)
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Demo login failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="auth-overlay" onClick={onClose}>
+      <div className="auth-card" onClick={e => e.stopPropagation()}>
+        <div className="auth-top">
+          <div className="auth-logo">
+            <span className="brand-mark">S</span>
+            <span style={{ font: '800 18px Manrope, sans-serif', color: '#1e2536' }}>
+              stocksense<span className="brand-dot">.</span>
+            </span>
+          </div>
+          <h2 className="auth-title">Inventory Intelligence</h2>
+          <p className="auth-subtitle">Sign in to access your replenishment forecasting workspace</p>
+        </div>
+
+        <div className="auth-tabs">
+          <button
+            type="button"
+            className={`auth-tab ${tab === 'login' ? 'active' : ''}`}
+            onClick={() => { setTab('login'); setError('') }}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            className={`auth-tab ${tab === 'register' ? 'active' : ''}`}
+            onClick={() => { setTab('register'); setError('') }}
+          >
+            Create Account
+          </button>
+        </div>
+
+        <form className="auth-body" onSubmit={handleSubmit}>
+          {error && <div className="auth-alert">⚠ {error}</div>}
+
+          {tab === 'register' && (
+            <div className="auth-group">
+              <label>FULL NAME</label>
+              <input
+                type="text"
+                placeholder="e.g. Alex Morgan"
+                value={fullName}
+                onChange={e => setFullName(e.target.value)}
+              />
+            </div>
+          )}
+
+          <div className="auth-group">
+            <label>EMAIL ADDRESS</label>
+            <input
+              type="email"
+              required
+              placeholder="you@company.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+          </div>
+
+          <div className="auth-group">
+            <label>PASSWORD</label>
+            <input
+              type="password"
+              required
+              placeholder={tab === 'register' ? 'Min 8 characters' : 'Enter your password'}
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+          </div>
+
+          <button type="submit" className="auth-submit" disabled={loading}>
+            {loading ? 'Authenticating…' : tab === 'login' ? 'Sign In →' : 'Create Account →'}
+          </button>
+
+          <div className="auth-divider">Or quick test</div>
+
+          <button type="button" className="auth-demo-btn" onClick={fillDemo} disabled={loading}>
+            ⚡ Demo Admin Login (admin@stocksense.io)
+          </button>
+        </form>
+      </div>
+    </div>
+  )
 }
 
 export default App
