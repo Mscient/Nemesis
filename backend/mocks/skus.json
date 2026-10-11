@@ -1,0 +1,32 @@
+[
+  {
+    "sku": "WATER-500",
+    "name": "Water 500 ml",
+    "status": "REORDER",
+    "inventory_position": 60,
+    "reorder_point": 65,
+    "on_hand": 60,
+    "on_order": 0,
+    "is_synthetic": true
+  },
+  {
+    "sku": "JUICE-1L",
+    "name": "Orange Juice 1 L",
+    "status": "OK",
+    "inventory_position": 150,
+    "reorder_point": 90,
+    "on_hand": 150,
+    "on_order": 0,
+    "is_synthetic": true
+  },
+  {
+    "sku": "COLA-355",
+    "name": "Cola 355 ml",
+    "status": "AT_RISK",
+    "inventory_position": 20,
+    "reorder_point": 65,
+    "on_hand": 20,
+    "on_order": 0,
+    "is_synthetic": true
+  }
+]

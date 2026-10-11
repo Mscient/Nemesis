@@ -1,0 +1,23 @@
+{
+  "sku": "WATER-500",
+  "scenario_type": "demand_surge",
+  "before": {
+    "stockout_probability": 0.05,
+    "expected_unmet_units": 2.0,
+    "average_inventory": 35.0,
+    "total_cost_p10": 120.0,
+    "total_cost_p50": 185.0,
+    "total_cost_p90": 260.0
+  },
+  "after": {
+    "stockout_probability": 0.18,
+    "expected_unmet_units": 9.5,
+    "average_inventory": 12.0,
+    "total_cost_p10": 190.0,
+    "total_cost_p50": 310.0,
+    "total_cost_p90": 460.0
+  },
+  "delta_rop": 15.0,
+  "delta_safety_stock": 8.0,
+  "recommended_action": "Increase order quantity by 30% and expedite next order."
+}

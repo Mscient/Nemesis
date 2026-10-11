@@ -1,0 +1,33 @@
+{
+  "sku": "WATER-500",
+  "as_of": "2026-10-11",
+  "action": "ORDER_NOW",
+  "order_quantity": 428,
+  "inventory_position": 60,
+  "reorder_point": 65,
+  "safety_stock": 15,
+  "forecast": {
+    "model": "holt_winters",
+    "avg_daily_demand": 10.0,
+    "sigma_daily": 4.0
+  },
+  "inputs": {
+    "service_level": 0.95,
+    "z_factor": 1.645,
+    "lead_time_days": 5,
+    "lead_time_std_days": 0
+  },
+  "formulas": {
+    "safety_stock": "z × σd × √L = 1.645 × 4 × √5 = 14.71 → 15",
+    "reorder_point": "(μd × L) + SS = (10 × 5) + 15 = 65",
+    "order_quantity": "EOQ = √(2DS/H) = 427.2 → 428"
+  },
+  "assumptions": [
+    "Demand ~ Normal(μ=10.00, σ=4.00)",
+    "Lead time = 5 days (σL=0)",
+    "Service level = 95% → z=1.645"
+  ],
+  "ai_adjustments": [],
+  "warnings": [],
+  "confidence": "medium"
+}

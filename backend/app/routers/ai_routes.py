@@ -1,23 +1,23 @@
+"""
+AI status endpoint — B10.
+POST /api/skus/{sku}/anomalies/suggest is in anomalies.py.
+POST /api/skus/{sku}/explain is in skus.py.
+POST /api/skus/{sku}/adjustments/propose is in skus.py.
+"""
+from __future__ import annotations
+
 from fastapi import APIRouter
 from app.config import settings
+from app.schemas import AIStatusResponse
 
 router = APIRouter(tags=["ai"])
 
 
-@router.get("/ai/status")
+@router.get("/ai/status", response_model=AIStatusResponse)
 def ai_status():
-    return {
-        "enabled": settings.ai_enabled,
-        "provider": settings.llm_provider,
-        "model": settings.llm_model,
-    }
-
-
-@router.post("/skus/{sku}/explain")
-async def explain_recommendation(sku: str):
-    return {"explanation": "AI disabled — template fallback.", "used_fallback": True}
-
-
-@router.patch("/adjustments/{adjustment_id}")
-def update_adjustment(adjustment_id: int):
-    return {"id": adjustment_id}
+    """Return AI enabled status, provider and model name."""
+    return AIStatusResponse(
+        enabled=settings.ai_enabled,
+        provider=settings.llm_provider,
+        model=settings.llm_model,
+    )
